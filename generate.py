@@ -1,4 +1,5 @@
 import os
+import webbrowser
 
 BODY_NAMES = {
     1: "Ogre",
@@ -469,12 +470,10 @@ BODY_NAMES = {
     1552: "Giant Dog, Rottweiler"
 }
 
-
 def generate_html_report(screenshot_dir):
-    html_report = os.path.join(screenshot_dir, "body_values_report.html")
+    html_report = os.path.join(screenshot_dir, "index.html")
     png_files = sorted([f for f in os.listdir(screenshot_dir) if f.lower().endswith('.png')])
     
-    # Contar quantos realmente serão adicionados (não vazios e válidos)
     valid_files = []
     for filename in png_files:
         try:
@@ -752,6 +751,18 @@ def generate_html_report(screenshot_dir):
             align-items: center;
             justify-content: center;
         }}
+        .footer {{
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            text-align: center;
+            padding: .5rem;
+            margin-top: 1rem;
+            box-shadow: var(--shadow);
+            font-size: 0.9rem;
+        }}
         
         @media (max-width: 768px) {{
             .container {{
@@ -783,7 +794,7 @@ def generate_html_report(screenshot_dir):
     <div class="controls">
         <div class="search-container">
             <span id="itemCount" style="white-space: nowrap; margin-left: 10px;">{items_added} Bodys</span>
-            <input type="text" id="searchInput" placeholder="Pesquisar body value..." oninput="searchBody()">
+            <input type="text" id="searchInput" placeholder="Pesquisar body value ou nome..." oninput="searchBody()">
             <div class="range-filter">
                 <input type="number" id="minValue" class="range-input" placeholder="Mínimo" oninput="filterByRange()">
                 <span>até</span>
@@ -811,11 +822,12 @@ def generate_html_report(screenshot_dir):
                 continue
             
             body_name = BODY_NAMES.get(body_value, "Desconhecido")
-            
+        
+        # ATENÇÃO: Modifique esta parte para os caminhos das imagens:
             f.write(f'''
         <div class="item">
             <div class="item-img-container" onclick="openModal('{filename}')">
-                <img class="item-img" src="UO_BodyValues/{filename}" alt="Body {body_value}" loading="lazy">
+                <img class="item-img" src="{filename}" alt="Body {body_value}" loading="lazy">
             </div>
             <div class="item-info">
                 <h3>Body {body_value}</h3>
@@ -851,6 +863,14 @@ def generate_html_report(screenshot_dir):
             <div class="modal-info" id="modalInfo"></div>
         </div>
     </div>
+    <div class="footer">
+        Desenvolvido por Luiz Sauer - <span id="currentYear"></span>
+        <script>
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+        </script>
+    </div>
+
+
 
     <script>
         // Estado da aplicação
@@ -894,43 +914,39 @@ def generate_html_report(screenshot_dir):
             setupEventListeners();
         }
         
-        // Filtro de busca (Pesquisa por nome)
-        function searchBody() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            state.images.forEach(img => {
-                const isMatch = img.bodyValue.toLowerCase().includes(query);
-                img.element.style.display = isMatch ? 'block' : 'none';
-            });
-        }
         function updateItemCount() {
             const items = document.querySelectorAll('.item');
             const visibleItems = Array.from(items).filter(item => item.style.display !== 'none');
             document.getElementById('itemCount').innerText = `${visibleItems.length} itens`;
         }
 
-        // Modificar as funções de filtro para chamar updateItemCount
         function searchBody() {
             const input = document.getElementById('searchInput').value.toLowerCase();
             const items = document.querySelectorAll('.item');
             
             items.forEach(item => {
                 const title = item.querySelector('.item-info h3').innerText.toLowerCase();
-                if (title.includes(input)) {
+                const name = item.querySelector('.item-info p').innerText.toLowerCase();
+                if (title.includes(input) || name.includes(input)) {
                     item.style.display = '';
                 } else {
                     item.style.display = 'none';
                 }
             });
-            updateItemCount(); // <<< ADICIONAR ISSO NO FINAL
+            updateItemCount();
         }
 
-        // Filtro por intervalo (min/max)
         function filterByRange() {
             const min = parseInt(document.getElementById('minValue').value) || 0;
             const max = parseInt(document.getElementById('maxValue').value) || Infinity;
             const items = document.querySelectorAll('.item');
             
             items.forEach(item => {
+                // Só filtra itens que já estão visíveis (não foram ocultados pela pesquisa)
+                if (item.style.display === 'none' && item.style.display !== '') {
+                    return;
+                }
+                
                 const bodyValue = parseInt(item.querySelector('.item-info h3').innerText);
                 if (!isNaN(bodyValue) && bodyValue >= min && bodyValue <= max) {
                     item.style.display = '';
@@ -938,7 +954,7 @@ def generate_html_report(screenshot_dir):
                     item.style.display = 'none';
                 }
             });
-            updateItemCount(); // <<< ADICIONAR ISSO NO FINAL
+            updateItemCount();
         }
         
         // Configurar listeners de eventos
@@ -1100,27 +1116,6 @@ def generate_html_report(screenshot_dir):
             }
         }
         
-        // Pesquisar body values
-        function searchBody() {
-            const input = document.getElementById('searchInput').value.toLowerCase();
-            dom.items.forEach(item => {
-                const text = item.querySelector('h3').textContent.toLowerCase();
-                item.style.display = text.includes(input) ? '' : 'none';
-            });
-        }
-        
-        // Filtrar por range
-        function filterByRange() {
-            const minValue = parseInt(document.getElementById('minValue').value) || 0;
-            const maxValue = parseInt(document.getElementById('maxValue').value) || Infinity;
-            
-            dom.items.forEach(item => {
-                const bodyValue = parseInt(item.querySelector('h3').textContent.replace('Body ', ''));
-                const isInRange = bodyValue >= minValue && bodyValue <= maxValue;
-                item.style.display = isInRange ? '' : 'none';
-            });
-        }
-        
         // Alternar entre modos de visualização
         function setViewMode(mode) {
             const container = document.getElementById('imageContainer');
@@ -1139,3 +1134,29 @@ def generate_html_report(screenshot_dir):
 </body>
 </html>''')
     return html_report
+
+
+def main():
+    # Configurações
+    SCREENSHOT_DIR = "public/UO_BodyValues"
+    os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+
+    print("=== UO BodyValue HTML Generator ===")
+    print(f"Gerando relatório a partir das imagens em: {os.path.abspath(SCREENSHOT_DIR)}")
+
+    try:
+        # Gera o relatório
+        html_report = generate_html_report(SCREENSHOT_DIR)
+        print(f"\nRelatório gerado com sucesso: {os.path.abspath(html_report)}")
+        
+        # Abre no navegador
+        webbrowser.open(f'file://{os.path.abspath(html_report)}')
+
+    except Exception as e:
+        print(f"\nErro durante execução: {str(e)}")
+
+    finally:
+        print("Operação finalizada.")
+
+if __name__ == "__main__":
+    main()
